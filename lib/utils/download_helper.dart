@@ -1,10 +1,10 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
+
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class DownloadHelper {
-  final Dio _dio = Dio();
+
 
   Future<bool> requestPermission() async {
     if (Platform.isAndroid) {
@@ -30,15 +30,18 @@ class DownloadHelper {
     }
   }
 
-  Future<String> downloadStream(String url, String fileName, String folderType, Function(int, int) onProgress) async {
+  Future<String> downloadStream(
+      Stream<List<int>> stream, 
+      int totalBytes, 
+      String fileName, 
+      String folderType, 
+      Function(int, int) onProgress) async {
     try {
       Directory? directory;
       if (Platform.isAndroid) {
-         // Direct path to public Downloads or Music folder for easier access
-         // Note: Scoped Storage might strict this, but standard Downloads is usually safe
          directory = Directory('/storage/emulated/0/$folderType');
          if (!await directory.exists()) {
-           directory = await getExternalStorageDirectory(); // Fallback to app data
+           directory = await getExternalStorageDirectory(); 
          }
       } else {
         directory = await getApplicationDocumentsDirectory();
@@ -49,12 +52,19 @@ class DownloadHelper {
       // Clean filename
       final cleanName = fileName.replaceAll(RegExp(r'[^\w\s\.]+'), '');
       final savePath = '${directory.path}/$cleanName';
+      final file = File(savePath);
 
-      await _dio.download(
-        url,
-        savePath,
-        onReceiveProgress: onProgress,
-      );
+      final fileSink = file.openWrite();
+      
+      int receivedBytes = 0;
+      await for (final chunk in stream) {
+        fileSink.add(chunk);
+        receivedBytes += chunk.length;
+        onProgress(receivedBytes, totalBytes);
+      }
+      
+      await fileSink.flush();
+      await fileSink.close();
 
       return savePath;
     } catch (e) {
