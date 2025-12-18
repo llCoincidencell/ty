@@ -1,0 +1,25 @@
+name: yt_flutter_app
+description: YouTube Video ve Muzik Indirici
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  youtube_explode_dart: ^2.0.0
+  permission_handler: ^11.0.0
+  path_provider: ^2.1.1
+  dio: ^5.3.3
+  google_fonts: ^6.1.0
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
