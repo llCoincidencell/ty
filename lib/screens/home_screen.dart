@@ -135,13 +135,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 10),
                   const Divider(),
                   const Text("Ses (Müzik)", style: TextStyle(fontWeight: FontWeight.bold)),
-                  ...manifest.audioOnly.sortByBitrate().reversed.take(3).map((audio) {
+                  ...manifest.audioOnly.sortByBitrate().reversed.map((audio) {
                      return ListTile(
-                       leading: const Icon(Icons.music_note),
-                       title: Text("MP3 / Audio (${(audio.bitrate.bitsPerSecond / 1000).ceil()} kbps)"),
+                       leading: Icon(Icons.music_note, 
+                         color: audio.container.name == 'mp4' ? Colors.green : Colors.grey),
+                       title: Text("Ses (${(audio.bitrate.bitsPerSecond / 1000).ceil()} kbps) - ${audio.container.name}"),
                        subtitle: Text("${(audio.size.totalBytes / 1024 / 1024).toStringAsFixed(1)} MB"),
                        onTap: () {
                          Navigator.pop(context);
+                         // Use correct extension if possible, but user wants mp3 file
+                         // We will keep 'mp3' extension but download the stream. 
+                         // Note: M4A (AAC) renamed to MP3 works on many players, WebM (Opus) less so.
                          _downloadContent(video, audio, 'Music', 'mp3');
                        },
                      );
