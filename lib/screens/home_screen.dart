@@ -181,19 +181,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _downloadContent(Video video, StreamInfo streamInfo, String folder, String ext) async {
+    // Show immediate feedback
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const AlertDialog(
+        content: Row(
+          children: [
+             CircularProgressIndicator(),
+             SizedBox(width: 20),
+             Text("İndirme Başlatılıyor...")
+          ],
+        ),
+      ),
+    );
+    
+    // Slight delay to let dialog render
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) Navigator.pop(context); // Close starting dialog
+
     setState(() {
       _isLoading = true;
-      _statusMessage = 'İndirme Başlıyor: ${video.title}';
+      _statusMessage = 'Hazırlanıyor: ${video.title}';
     });
 
     try {
-       final hasPermission = await _downloadHelper.requestPermission();
-       if (!hasPermission) throw Exception("İzin verilmedi");
-
+       // Just call helper, it handles permission/path logic now
        final stream = _ytService.getStream(streamInfo);
        final fileName = '${video.title}.$ext';
 
-       await _downloadHelper.downloadStream(
+       final path = await _downloadHelper.downloadStream(
          stream,
          streamInfo.size.totalBytes,
          fileName,
@@ -209,18 +226,45 @@ class _HomeScreenState extends State<HomeScreen> {
        );
        
        setState(() {
-         _statusMessage = 'İndirme Tamamlandı!';
+         _statusMessage = 'İndirme Bitti!';
          _progress = 1.0;
        });
+
+       if (mounted) {
+         showDialog(
+           context: context,
+           builder: (c) => AlertDialog(
+             title: const Text("Başarılı!"),
+             content: Text("Dosya kaydedildi:\n\n$path\n\n(Dosya Yöneticisi'nden bu konumu açabilirsiniz)"),
+             actions: [
+               TextButton(onPressed: () => Navigator.pop(c), child: const Text("Tamam"))
+             ],
+           ),
+         );
+       }
 
     } catch (e) {
       setState(() {
         _statusMessage = 'Hata: $e';
       });
+      if (mounted) {
+         showDialog(
+           context: context,
+           builder: (c) => AlertDialog(
+             title: const Text("Hata Oluştu"),
+             content: Text(e.toString()),
+             actions: [
+               TextButton(onPressed: () => Navigator.pop(c), child: const Text("Tamam"))
+             ],
+           ),
+         );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

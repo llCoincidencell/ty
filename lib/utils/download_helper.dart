@@ -7,28 +7,14 @@ class DownloadHelper {
 
 
   Future<bool> requestPermission() async {
+    // We will use app-specific storage which doesn't strictly need permission on many Android versions,
+    // but asking for it helps for some legacy devices.
     if (Platform.isAndroid) {
-      // Android 13+ support could be tricky with just storage perms
-      // simple implementation for now
-      // Android 11+ (API 30+) requires MANAGE_EXTERNAL_STORAGE for direct access to public folders
-      if (await Permission.manageExternalStorage.status.isDenied) {
-        await Permission.manageExternalStorage.request();
-      }
-      
-      // Check legacy permission
-      var status = await Permission.storage.status;
-      if (!status.isGranted) {
-        status = await Permission.storage.request();
-      }
-      
-      // Android 13+ media permissions (granular)
-      if (await Permission.videos.status.isDenied) await Permission.videos.request();
-      if (await Permission.audio.status.isDenied) await Permission.audio.request();
-
-      return await Permission.manageExternalStorage.isGranted || status.isGranted || await Permission.videos.isGranted;
-    } else {
-      return true; 
+      // Just ask basics, don't block logic if denied
+      await Permission.storage.request(); 
+      await Permission.manageExternalStorage.request();
     }
+    return true; // Always return true to attempt download in safe folder
   }
 
   Future<String> downloadStream(
@@ -40,20 +26,24 @@ class DownloadHelper {
     try {
       Directory? directory;
       if (Platform.isAndroid) {
-         // Try public folder first
-         directory = Directory('/storage/emulated/0/$folderType');
-         // If we can't write there (no permission), fallback to app-specific storage
-         try {
-           if (!await directory.exists()) {
-             await directory.create(recursive: true);
-           }
-           // Test write access
-           final testFile = File('${directory.path}/test_write');
-           await testFile.writeAsString('test');
-           await testFile.delete();
-         } catch (e) {
-           // Fallback if public folder is not accessible
-           directory = await getExternalStorageDirectory(); 
+         // USE SAFE FOLDER (Android/data/...) to guarantee write access without permission hell
+         directory = await getExternalStorageDirectory(); 
+         // Optional: Try to create a 'YT_Downloads' subfolder
+         if (directory != null) {
+            String newPath = directory.path.split('Android')[0] + 'Download'; 
+            // Try accessing public Download folder as best effort
+            final publicDir = Directory(newPath);
+            if (await publicDir.exists()) {
+               // Try writing a test file to see if we really can
+               try {
+                 final t = File('${publicDir.path}/test_permission');
+                 await t.writeAsString('k');
+                 await t.delete();
+                 directory = publicDir; // Success! Use public folder
+               } catch (e) {
+                 // Ignore, fallback to safe directory
+               }
+            }
          }
       } else {
         directory = await getApplicationDocumentsDirectory();
@@ -61,7 +51,6 @@ class DownloadHelper {
 
       if (directory == null) throw Exception("Depolama alanı bulunamadı");
 
-      // Clean filename
       final cleanName = fileName.replaceAll(RegExp(r'[^\w\s\.]+'), '');
       final savePath = '${directory.path}/$cleanName';
       final file = File(savePath);
