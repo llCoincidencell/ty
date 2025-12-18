@@ -135,21 +135,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 10),
                   const Divider(),
                   const Text("Ses (Müzik)", style: TextStyle(fontWeight: FontWeight.bold)),
-                  ...manifest.audioOnly.sortByBitrate().reversed.map((audio) {
+                  ...manifest.audioOnly.sortByBitrate().reversed
+                      .where((a) => a.bitrate.bitsPerSecond > 60000 && a.container.name == 'mp4')
+                      .map((audio) {
+                     final kbps = (audio.bitrate.bitsPerSecond / 1000).ceil();
                      return ListTile(
-                       leading: Icon(Icons.music_note, 
-                         color: audio.container.name == 'mp4' ? Colors.green : Colors.grey),
-                       title: Text("Ses (${(audio.bitrate.bitsPerSecond / 1000).ceil()} kbps) - ${audio.container.name}"),
-                       subtitle: Text("${(audio.size.totalBytes / 1024 / 1024).toStringAsFixed(1)} MB"),
+                       leading: const Icon(Icons.music_note, color: Colors.green),
+                       title: Text("MP3 Ses ($kbps kbps)"),
+                       subtitle: Text("Uyumlu Format - ${(audio.size.totalBytes / 1024 / 1024).toStringAsFixed(1)} MB"),
+                       trailing: kbps > 120 ? const Chip(label: Text("HQ"), backgroundColor: Colors.green) : null,
                        onTap: () {
                          Navigator.pop(context);
-                         // Use correct extension if possible, but user wants mp3 file
-                         // We will keep 'mp3' extension but download the stream. 
-                         // Note: M4A (AAC) renamed to MP3 works on many players, WebM (Opus) less so.
                          _downloadContent(video, audio, 'Music', 'mp3');
                        },
                      );
                   }),
+                  if (manifest.audioOnly.where((a) => a.container.name == 'mp4').isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Text("Bu video için uygun MP3 formatı bulunamadı.", style: TextStyle(color: Colors.red)),
+                    ),
                   const Divider(),
                   const Text("Video", style: TextStyle(fontWeight: FontWeight.bold)),
                   ...manifest.muxed.sortByVideoQuality().reversed.take(3).map((videoStream) {
@@ -243,7 +248,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
       try {
         final manifest = await _ytService.getManifest(video.id.value);
-        final audioStream = manifest.audioOnly.withHighestBitrate();
+        // Prefer MP4 (AAC) for MP3 renaming compatibility
+        final audioStreams = manifest.audioOnly.where((s) => s.container.name == 'mp4').toList();
+        final audioStream = audioStreams.isNotEmpty 
+            ? audioStreams.withHighestBitrate() 
+            : manifest.audioOnly.withHighestBitrate(); // Fallback
         
         final hasPermission = await _downloadHelper.requestPermission();
         if(!hasPermission) throw Exception("İzin yok");
