@@ -38,23 +38,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _initSharingListener() {
     // For sharing or opening while app is running
-    _intentSub = ReceiveSharingIntent.getTextStream().listen((String value) {
-      _handleSharedText(value);
+    _intentSub = ReceiveSharingIntent.instance.getMediaStream().listen((List<SharedMediaFile> value) {
+      if (value.isNotEmpty) {
+        _handleSharedText(value.first.path);
+      }
     }, onError: (err) {
       debugPrint("Sharing error: $err");
     });
 
     // For sharing when app is closed
-    ReceiveSharingIntent.getInitialText().then((String? value) {
-      if (value != null) {
-        _handleSharedText(value);
+    ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
+      if (value.isNotEmpty) {
+        _handleSharedText(value.first.path);
       }
     });
   }
 
   void _handleSharedText(String text) {
-    // Shared text might contain other things, try to extract URL
-    // Simple approach: put everything in box and try to fetch
+    // Shared text often comes as a path or direct text
+    // We just take it and put it in the URL box
     _urlController.text = text;
     _fetchInfo();
   }
@@ -136,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ...manifest.audioOnly.sortByBitrate().reversed.take(3).map((audio) {
                      return ListTile(
                        leading: const Icon(Icons.music_note),
-                       title: Text("MP3 / Audio (${audio.bitrate.kbit} kbps)"),
+                       title: Text("MP3 / Audio (${(audio.bitrate.bitsPerSecond / 1000).ceil()} kbps)"),
                        subtitle: Text("${(audio.size.totalBytes / 1024 / 1024).toStringAsFixed(1)} MB"),
                        onTap: () {
                          Navigator.pop(context);
